@@ -3,7 +3,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const app = express();
 const PORT = 3000;
-const FILE = './vytahy.json';
+const FILE = path.join(__dirname, 'public', 'vytahy.json');
+
 
 app.use(express.json());
 app.use(express.static('public'));
