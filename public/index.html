@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Správa Výtahů</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Google Fonts: Noto Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    html, body {
+      font-family: 'Noto Sans', Arial, sans-serif;
+      background: #f3f6fa;
+      color: #222;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 0 16px;
+    }
+    header {
+      background: linear-gradient(90deg, #2980b9 0%, #6dd5fa 100%);
+      color: #fff;
+      padding: 32px 0 24px 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+    header h1 {
+      font-weight: 700;
+      font-size: 2.2rem;
+      margin: 0 0 12px 0;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+    .search-box, select {
+      font-family: inherit;
+      padding: 10px 14px;
+      border-radius: 7px;
+      border: 1px solid #cfd8dc;
+      font-size: 1rem;
+      margin-bottom: 0;
+      background: #fff;
+      outline: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      transition: border 0.2s;
+    }
+    .search-box:focus, select:focus {
+      border-color: #2980b9;
+    }
+    .export-buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+    .export-pdf-button,
+    .export-button {
+      padding: 11px 18px;
+      border: none;
+      border-radius: 7px;
+      font-size: 15px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      transition: background 0.2s, transform 0.1s;
+      outline: none;
+      letter-spacing: 0.5px;
+    }
+    .export-pdf-button:hover,
+    .export-button:hover {
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    }
+    .export-calendar-toggle {
+      background: #34495e;
+    }
+    .export-calendar-toggle:hover { background: #232f3e; }
+    .export-all { background: #2980b9; }
+    .export-all:hover { background: #1c5d8e; }
+    .export-selected { background: #16a085; }
+    .export-selected:hover { background: #117864; }
+    .export-calendar { background: #2ecc71; color: #fff; }
+    .export-calendar:hover { background: #229954; }
+    .export-revize { background: #e67e22; }
+    .export-revize:hover { background: #ba6b17; }
+    .export-zkousky { background: #8e44ad; }
+    .export-zkousky:hover { background: #5e3370; }
+    .export-inspekce { background: #c0392b; }
+    .export-inspekce:hover { background: #922b21; }
+    .vytahy-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .vytah-summary {
+      margin: 12px 0 0 0;
+      border: 1px solid #dde3ea;
+      border-radius: 7px;
+      padding: 14px 18px;
+      background: #f8f9fa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    }
+    .vytah-summary:hover {
+      background: #eaf3fb;
+      box-shadow: 0 4px 16px rgba(41,128,185,0.08);
+    }
+    .vytah-summary strong {
+      color: #2980b9;
+      font-size: 1.13em;
+      min-width: 180px;
+      flex: 1;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .termins {
+      display: flex;
+      gap: 24px;
+      flex: 2;
+      justify-content: flex-end;
+    }
+    .termin-label {
+      font-size: 1.08em;
+      font-weight: bold;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 112px;
+      background: #fff;
+      border-radius: 5px;
+      padding: 5px 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+      border: 1px solid #e0e0e0;
+    }
+    .datum-expirace { color: #e74c3c; }
+    .datum-blizko { color: #e67e22; }
+    .datum-ok { color: #27ae60; }
+    .vytah-detail {
+      margin: 0 0 22px 0;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      display: none;
+      animation: fadeIn 0.2s;
+      box-shadow: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .vytah-card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-left: 5px solid #3498db;
+      border-radius: 8px;
+      margin: 15px 0;
+      padding: 20px 20px 15px 20px;
+      box-shadow: none;
+      transition: 0.3s;
+      position: relative;
+    }
+    .vytah-card.karta-blizko { border-left: 5px solid orange !important; }
+    .vytah-card.karta-expirace { border-left: 5px solid red !important; }
+    .vytah-card:hover {
+      transform: scale(1.01);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }
+    .vytah-card input[type="date"] {
+      margin-top: 5px;
+      margin-bottom: 10px;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      display: block;
+    }
+    .vytah-card div[id^="dalsi"] {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .checkbox-wrapper {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+    .checkbox-text {
+      margin-left: 6px;
+    }
+    #login-box {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(41,128,185,0.08);
+      padding: 32px 24px 24px 24px;
+      margin-top: 50px;
+    }
+    #login-box h2 {
+      margin-bottom: 18px;
+      color: #2980b9;
+      font-weight: 700;
+      font-size: 1.3em;
+    }
+    #zprava {
+      color: #e74c3c;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 12px;
+      min-height: 24px;
+    }
+    footer {
+      text-align: center;
+      background: #eaf3fb;
+      padding: 18px 0 14px 0;
+      font-size: 15px;
+      color: #666;
+      border-top: 1px solid #dbe5ef;
+      margin-top: 30px;
+    }
+    @media (max-width: 700px) {
+      .container { padding: 10px 2vw; }
+      .export-buttons-row { flex-direction: column; gap: 8px; }
+      .vytah-summary, .vytah-detail { padding: 10px 6px; }
+      .termins { gap: 10px; }
+      .termin-label { min-width: 80px; font-size: 0.98em; }
+      .vytah-card { padding: 12px 5px 10px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Správa výtahů</h1>
+      <button id="odhlasit" class="export-button export-calendar-toggle" style="float: right; margin-top: 5px;">Odhlásit</button>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+        <input type="text" id="hledani" class="search-box" placeholder="Hledat výtah podle názvu...">
+        <select id="filtrTerminu" class="search-box" style="max-width: 220px;">
+          <option value="vse">🟢 Všechny výtahy</option>
+          <option value="revize">🟡 Hrozí revize</option>
+          <option value="zkouska">🟠 Hrozí zkouška</option>
+          <option value="inspekce">🔵 Hrozí inspekce</option>
+          <option value="expirace">🔴 Expirované</option>
+        </select>          
+      </div>
+    </div>
+  </header>
+  <main>
+    <!-- Přihlašovací box -->
+    <div id="login-box" style="max-width: 400px; margin: 40px auto; text-align: center;">
+      <h2>Přihlášení</h2>
+      <input type="text" id="username" class="search-box" placeholder="Uživatelské jméno"><br><br>
+      <input type="password" id="password" class="search-box" placeholder="Heslo"><br><br>
+      <button onclick="prihlasit()" class="export-button export-calendar-toggle">Přihlásit</button>
+      <div id="login-status" style="margin-top: 10px; color: red;"></div>
+    </div>
+    <div class="container" id="main-app" style="display:none;">
+      <div class="export-buttons-row">
+        <button id="prepniZobrazeni" class="export-button export-calendar-toggle">Zobrazit kalendář</button>
+        <button id="exportListMonthPDF" class="export-pdf-button export-calendar">Exportovat tento měsíc do PDF</button>
+        <button id="exportPDF" class="export-pdf-button export-all">Exportovat do PDF (seznam)</button>
+        <button id="exportVybranePDF" class="export-pdf-button export-selected">Exportovat vybrané</button>
+        <button id="exportKalendarPDF" class="export-pdf-button export-calendar">Exportovat kalendář</button>
+        <button id="exportRevizePDF" class="export-pdf-button export-revize">Exportovat revize</button>
+        <button id="exportZkouskyPDF" class="export-pdf-button export-zkousky">Exportovat odborné zkoušky</button>
+        <button id="exportInspekcePDF" class="export-pdf-button export-inspekce">Exportovat inspekční prohlídky</button>
+      </div>
+      <ul id="vytahy" class="vytahy-list"></ul>
+      <ul id="vytahy" class="vytahy-list"></ul>
+<div id="formular-sekce">
+  <h2>Přidat nový výtah</h2>
+  <form id="formular-vytah" class="vytah-card" style="margin-bottom: 30px;">
+    <input type="hidden" id="novy-id">
+    <input type="text" placeholder="Název výtahu" id="novy-nazev" required>
+    <input type="text" placeholder="Adresa" id="novy-adresa" required>
+    <input type="text" placeholder="Výrobce" id="novy-vyrobce">
+    <input type="text" placeholder="Výrobní číslo" id="novy-vyrobniCislo">
+    <input type="text" placeholder="Typ výtahu" id="novy-typ">
+    <input type="date" placeholder="Datum výroby" id="novy-datumVyroby">
+    <input type="number" placeholder="Počet pater" id="novy-pocetPater">
+    <input type="text" placeholder="Zdvih" id="novy-zdvih">
+    <input type="number" placeholder="Nosnost (kg)" id="novy-nosnost">
+    <button type="submit" class="export-button export-calendar">Přidat výtah</button>
+  </form>
+</div>
+
+      <div id="kalendar" style="display:none; margin-top: 20px;"></div>
+      <div id="zprava" style="margin-top:20px;"></div>
+    </div>      
+  </main>
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Správa výtahů</p>
+    </div>
+  </footer>
+  <script>
+    let vsechnaData = [];
+    const seznam = document.getElementById('vytahy');
+    const hledani = document.getElementById('hledani');
+    const zprava = document.getElementById('zprava');
+    const filtrTerminu = document.getElementById('filtrTerminu');
+    const mainApp = document.getElementById('main-app');
+    document.getElementById('odhlasit').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      mainApp.style.display = 'none';
+      document.getElementById('login-box').style.display = 'block';
+      zprava.textContent = '';
+      vsechnaData = [];
+      seznam.innerHTML = '';
+    });
+
+    function prihlasit() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("Neplatné přihlašovací údaje.");
+        return res.json();
+      })
+      .then(data => {
+        localStorage.setItem('token', data.token);
+        document.getElementById('login-box').style.display = 'none';
+        mainApp.style.display = 'block';
+        nactiVytahy();
+      })
+      .catch(err => {
+        document.getElementById('login-status').textContent = '❌ ' + err.message;
+      });
+    }
+
+    mainApp.style.display = 'none';
+    const token = localStorage.getItem('token');
+    if (token) {
+      document.getElementById('login-box').style.display = 'none';
+      mainApp.style.display = 'block';
+      nactiVytahy();
+    }
+
+    function nactiVytahy() {
+      fetch('/api/vytahy', {
+        headers: { 'Authorization': localStorage.getItem('token') || '' }
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Chyba při načítání výtahů – pravděpodobně nepřihlášen.');
+        return res.json();
+      })
+      .then(data => {
+        vsechnaData = data;
+        zobrazVytahy();
+      })
+      .catch(err => {
+        zprava.textContent = '❌ ' + err.message;
+      });
+      document.getElementById('formular-vytah').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const novy = {
+    nazev: document.getElementById('novy-nazev').value,
+    adresa: document.getElementById('novy-adresa').value,
+    vyrobce: document.getElementById('novy-vyrobce').value,
+    vyrobniCislo: document.getElementById('novy-vyrobniCislo').value,
+    typ: document.getElementById('novy-typ').value,
+    datumVyroby: document.getElementById('novy-datumVyroby').value,
+    pocetPater: parseInt(document.getElementById('novy-pocetPater').value) || 0,
+    zdvih: document.getElementById('novy-zdvih').value,
+    nosnost: parseInt(document.getElementById('novy-nosnost').value) || 0
+  };
+
+  fetch('/api/vytahy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': localStorage.getItem('token') || ''
+    },
+    body: JSON.stringify(novy)
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Chyba při ukládání výtahu.");
+    return res.json();
+  })
+  .then(() => {
+    zprava.textContent = '✅ Nový výtah byl přidán.';
+    nactiVytahy();
+    document.getElementById('formular-vytah').reset();
+  })
+  .catch(err => {
+    zprava.textContent = '❌ ' + err.message;
+  });
+});
+
+    }
+
+    function vyhodnotTermin(datumStr, delta) {
+      if (!datumStr) return 'neznamy';
+      const datum = new Date(datumStr);
+      if (isNaN(datum)) return 'neznamy';
+      if (delta.months) datum.setMonth(datum.getMonth() + delta.months);
+      if (delta.years) datum.setFullYear(datum.getFullYear() + delta.years);
+      const dnes = new Date();
+      dnes.setHours(0, 0, 0, 0);
+      datum.setHours(0, 0, 0, 0);
+      const rozdil = Math.ceil((datum - dnes) / (1000 * 60 * 60 * 24));
+      if (rozdil < 0) return 'expirace';
+      if (rozdil <= 30) return 'blizko';
+      return 'ok';
+    }
+
+    // Funkce pro převod datumu na formát d. m. yyyy
+    function formatDatum(datumStr) {
+      if (!datumStr) return '-';
+      const d = new Date(datumStr);
+      if (isNaN(d)) return '-';
+      return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+    }
+
+    function zobrazVytahy(filter = '', typFiltru = 'vse') {
+      seznam.innerHTML = '';
+      zprava.textContent = '';
+      const filtrovane = vsechnaData
+        .filter(v => v.nazev.toLowerCase().includes(filter.toLowerCase()))
+        .sort((a, b) => a.nazev.localeCompare(b.nazev));
+
+      const nyni = new Date();
+      const filtrovanePodleTerminu = filtrovane.filter(v => {
+        const terminy = [
+          { datum: v.revize, delta: { months: 3 } },
+          { datum: v.zkouska, delta: { years: 3 } },
+          { datum: v.inspekce, delta: { years: 6 } }
+        ].map(({ datum, delta }) => {
+          if (!datum) return null;
+          const d = new Date(datum);
+          if (delta.months) d.setMonth(d.getMonth() + delta.months);
+          if (delta.years) d.setFullYear(d.getFullYear() + delta.years);
+          return d;
+        });
+
+        if (typFiltru === 'revize') {
+          const d = terminy[0];
+          return d && (d - nyni) / (1000 * 60 * 60 * 24) <= 30 && d > nyni;
+        }
+        if (typFiltru === 'zkouska') {
+          const d = terminy[1];
+          return d && (d - nyni) / (1000 * 60 * 60 * 24) <= 30 && d > nyni;
+        }
+        if (typFiltru === 'inspekce') {
+          const d = terminy[2];
+          return d && (d - nyni) / (1000 * 60 * 60 * 24) <= 30 && d > nyni;
+        }
+        if (typFiltru === 'expirace') {
+          return terminy.some(d => d && d < nyni);
+        }
+        return true;
+      });
+
+      if (filtrovanePodleTerminu.length === 0) {
+        zprava.textContent = 'Žádné výtahy nenalezeny.';
+        return;
+      }
+
+      const podleMesta = {};
+      filtrovanePodleTerminu.forEach(v => {
+        if (!podleMesta[v.adresa]) podleMesta[v.adresa] = [];
+        podleMesta[v.adresa].push(v);
+      });
+
+      Object.keys(podleMesta).forEach(mesto => {
+        const nadpis = document.createElement('h2');
+        nadpis.textContent = mesto;
+        seznam.appendChild(nadpis);
+
+        podleMesta[mesto].forEach(v => {
+          const li = document.createElement('li');
+          // Určení stavu pro barvení datumů
+          const revizeStav = vyhodnotTermin(v.revize, { months: 3 });
+          const zkouskaStav = vyhodnotTermin(v.zkouska, { years: 3 });
+          const inspekceStav = vyhodnotTermin(v.inspekce, { years: 6 });
+
+          const revizeClass = revizeStav === 'expirace' ? 'datum-expirace' : revizeStav === 'blizko' ? 'datum-blizko' : 'datum-ok';
+          const zkouskaClass = zkouskaStav === 'expirace' ? 'datum-expirace' : zkouskaStav === 'blizko' ? 'datum-blizko' : 'datum-ok';
+          const inspekceClass = inspekceStav === 'expirace' ? 'datum-expirace' : inspekceStav === 'blizko' ? 'datum-blizko' : 'datum-ok';
+
+          let stavKarty = '';
+          if ([revizeStav, zkouskaStav, inspekceStav].includes('expirace')) {
+            stavKarty = 'karta-expirace';
+          } else if ([revizeStav, zkouskaStav, inspekceStav].includes('blizko')) {
+            stavKarty = 'karta-blizko';
+          }
+
+          li.innerHTML = `
+  <div class="vytah-summary">
+    <strong>${v.nazev}</strong>
+    <div class="termins">
+      <span class="termin-label ${revizeClass}">
+        Revize<br>${formatDatum(vypocitejDalsiDatum(v.revize, { months: 3 }))}
+      </span>
+      <span class="termin-label ${zkouskaClass}">
+        Zkouška<br>${formatDatum(vypocitejDalsiDatum(v.zkouska, { years: 3 }))}
+      </span>
+      <span class="termin-label ${inspekceClass}">
+        Inspekce<br>${formatDatum(vypocitejDalsiDatum(v.inspekce, { years: 6 }))}
+      </span>
+    </div>
+  </div>
+  <div class="vytah-detail">
+    <div class="vytah-card ${stavKarty}">
+      <div class="checkbox-wrapper">
+        <label>
+          <input type="checkbox" class="vytah-checkbox" data-id="${v.id}">
+          <span class="checkbox-text">Vybrat</span>
+        </label>
+      </div>
+      <strong>${v.nazev}</strong><br>
+      Výrobce: ${v.vyrobce}<br>
+      Datum výroby: ${v.datumVyroby}<br>
+      Počet pater: ${v.pocetPater}<br>
+      Zdvih: ${v.zdvih}<br>
+      Nosnost: ${v.nosnost}<br>
+      Výrobní číslo: ${v.vyrobniCislo}<br>
+      Typ výtahu: ${v.typ}<br>
+      Adresa: ${v.adresa}<br><br>
+
+      <label>Poslední revize:
+        <input type="date" id="revize-${v.id}" value="${v.revize || ''}">
+      </label>
+      <div id="dalsiRevize-${v.id}"></div>
+      <label>Poslední odborná zkouška:
+        <input type="date" id="zkouska-${v.id}" value="${v.zkouska || ''}">
+      </label>
+      <div id="dalsiZkouska-${v.id}"></div>
+      <label>Poslední inspekční prohlídka:
+        <input type="date" id="inspekce-${v.id}" value="${v.inspekce || ''}">
+      </label>
+      <div id="dalsiInspekce-${v.id}"></div>
+
+      <div class="tlacitko-smazat-container">
+        <button onclick="smazatVytah(${v.id})" class="smazat-button">🗑️ Smazat</button>
+      </div>
+    </div>
+  </div>
+`;
+
+          seznam.appendChild(li);
+
+          // Detail je defaultně schovaný
+          const summary = li.querySelector('.vytah-summary');
+          const detail = li.querySelector('.vytah-detail');
+          detail.style.display = "none";
+          summary.addEventListener('click', () => {
+            detail.style.display = detail.style.display === "none" ? "block" : "none";
+          });
+
+          // Funkce pro zobrazení termínu a ukládání
+          const zobrazDatum = (input, delta, targetId) => {
+            const val = input.value;
+            const target = document.getElementById(targetId);
+            target.textContent = '';
+            target.className = '';
+            if (!val) return;
+            const datum = new Date(val);
+            if (isNaN(datum)) return;
+            if (delta.months) datum.setMonth(datum.getMonth() + delta.months);
+            if (delta.years) datum.setFullYear(datum.getFullYear() + delta.years);
+            const dnes = new Date();
+            dnes.setHours(0, 0, 0, 0);
+            datum.setHours(0, 0, 0, 0);
+            const rozdil = Math.ceil((datum - dnes) / (1000 * 60 * 60 * 24));
+            target.textContent = `Další termín: ${datum.toLocaleDateString('cs-CZ')}`;
+            if (rozdil < 0) {
+              target.classList.add('dalsi-termin-expirace');
+            } else if (rozdil <= 30) {
+              target.classList.add('dalsi-termin-blizko');
+            } else {
+              target.classList.add('dalsi-termin');
+            }
+          };
+
+          const uloz = () => {
+            fetch(`/api/vytahy/${v.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('token') || ''
+              },
+              body: JSON.stringify({
+                revize: document.getElementById(`revize-${v.id}`).value,
+                zkouska: document.getElementById(`zkouska-${v.id}`).value,
+                inspekce: document.getElementById(`inspekce-${v.id}`).value
+              })
+            })
+            .then(res => res.ok ? zprava.textContent = '✅ Uloženo.' : res.text().then(msg => { throw new Error(msg); }))
+            .catch(err => zprava.textContent = '❌ ' + err.message)
+            .finally(() => setTimeout(() => { zprava.textContent = ''; }, 2000));
+          };
+
+          ['revize', 'zkouska', 'inspekce'].forEach(typ => {
+            const input = document.getElementById(`${typ}-${v.id}`);
+            const delta = typ === 'revize' ? { months: 3 } : typ === 'zkouska' ? { years: 3 } : { years: 6 };
+            const targetId = `dalsi${typ.charAt(0).toUpperCase() + typ.slice(1)}-${v.id}`;
+            input.addEventListener('change', () => { zobrazDatum(input, delta, targetId); uloz(); });
+            zobrazDatum(input, delta, targetId);
+          });
+        });
+      });
+    }
+
+    hledani.addEventListener('input', () => {
+      const typFiltru = filtrTerminu.value || 'vse';
+      zobrazVytahy(hledani.value, typFiltru);
+    });
+    filtrTerminu.addEventListener('change', () => {
+      zobrazVytahy(hledani.value, filtrTerminu.value);
+    });
+
+
+    // Kalendář a export do PDF zůstávají stejné...
+    let kalendarZobrazen = false;
+    document.getElementById('prepniZobrazeni').addEventListener('click', () => {
+  kalendarZobrazen = !kalendarZobrazen;
+  seznam.style.display = kalendarZobrazen ? 'none' : 'block';
+  document.getElementById('kalendar').style.display = kalendarZobrazen ? 'block' : 'none';
+  document.getElementById('formular-sekce').style.display = kalendarZobrazen ? 'none' : 'block';
+  document.getElementById('prepniZobrazeni').textContent = kalendarZobrazen ? 'Zobrazit seznam' : 'Zobrazit kalendář';
+  if (kalendarZobrazen) zobrazKalendar(vsechnaData);
+});
+
+
+    function zobrazKalendar(vytahy) {
+      const udalosti = [];
+      vytahy.forEach(v => {
+        const pushEvent = (datum, typ, barva) => {
+          if (!datum) return;
+          const d = new Date(datum);
+          if (!isNaN(d)) {
+            udalosti.push({ title: `${v.nazev} – ${typ}`, start: d.toISOString().split('T')[0], color: barva });
+          }
+        };
+        if (v.revize) { const d = new Date(v.revize); d.setMonth(d.getMonth() + 3); pushEvent(d, 'Revize', '#3498db'); }
+        if (v.zkouska) { const d = new Date(v.zkouska); d.setFullYear(d.getFullYear() + 3); pushEvent(d, 'Zkouška', '#2ecc71'); }
+        if (v.inspekce) { const d = new Date(v.inspekce); d.setFullYear(d.getFullYear() + 6); pushEvent(d, 'Inspekce', '#e67e22'); }
+      });
+      const kalDiv = document.getElementById('kalendar');
+      kalDiv.innerHTML = '';
+      new FullCalendar.Calendar(kalDiv, {
+        initialView: 'dayGridMonth',
+        locale: 'cs',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,listMonth'
+        },
+        events: udalosti
+      }).render();
+    }
+
+    // Export do PDF všech
+    document.getElementById('exportPDF').addEventListener('click', () => {
+      const filter = hledani.value.trim().toLowerCase();
+      const vytahyExport = filter
+        ? vsechnaData.filter(v => v.nazev.toLowerCase().includes(filter))
+        : vsechnaData;
+      exportToPDF(vytahyExport);
+    });
+    function formatDatum(datum) {
+  if (!datum) return '-';
+  const d = new Date(datum);
+  if (isNaN(d)) return '-';
+  return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
+}
+
+function vypocitejDalsiDatum(datumStr, delta) {
+  if (!datumStr) return null;
+  const datum = new Date(datumStr);
+  if (isNaN(datum)) return null;
+  if (delta.months) datum.setMonth(datum.getMonth() + delta.months);
+  if (delta.years) datum.setFullYear(datum.getFullYear() + delta.years);
+  return datum;
+}
+
+// Export pouze revizí
+document.getElementById('exportRevizePDF').addEventListener('click', () => {
+  const revizeVytahy = vsechnaData
+    .filter(v => v.revize)
+    .map(v => ({
+      nazev: v.nazev,
+      adresa: v.adresa,
+      datum: formatDatum(v.revize)
+    }));
+
+  exportJednoduchyPDF(revizeVytahy, "Seznam revizí", "Datum revize", "revize");
+});
+
+// Export pouze odborných zkoušek
+document.getElementById('exportZkouskyPDF').addEventListener('click', () => {
+  const zkouskyVytahy = vsechnaData
+    .filter(v => v.zkouska)
+    .map(v => ({
+      nazev: v.nazev,
+      adresa: v.adresa,
+      datum: formatDatum(v.zkouska)
+    }));
+
+  exportJednoduchyPDF(zkouskyVytahy, "Seznam odborných zkoušek", "Datum zkoušky", "zkousky");
+});
+
+// Export pouze inspekčních prohlídek
+document.getElementById('exportInspekcePDF').addEventListener('click', () => {
+  const inspekceVytahy = vsechnaData
+    .filter(v => v.inspekce)
+    .map(v => ({
+      nazev: v.nazev,
+      adresa: v.adresa,
+      datum: formatDatum(v.inspekce)
+    }));
+
+  exportJednoduchyPDF(inspekceVytahy, "Seznam inspekčních prohlídek", "Datum inspekce", "inspekce");
+});
+
+// Pomocná funkce pro jednoduchý export
+function exportJednoduchyPDF(data, nadpis, datumSloupec, typ) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont("times", "normal");
+  doc.setFontSize(16);
+  doc.text(nadpis, 14, 15);
+
+  doc.setFontSize(10);
+  const today = new Date().toLocaleDateString('cs-CZ');
+  doc.text(`Exportováno: ${today}`, 14, 22);
+
+  const head = [["Výtah", "Adresa", datumSloupec]];
+  const body = data.map(e => [e.nazev, e.adresa, e.datum]);
+
+  doc.autoTable({
+    head,
+    body,
+    startY: 28,
+    styles: { font: "times", fontSize: 10, cellPadding: 3, overflow: 'linebreak' },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    margin: { left: 10, right: 10 }
+  });
+
+  doc.save(`${typ}_vytahy_${today}.pdf`);
+}
+
+    document.getElementById('exportKalendarPDF').addEventListener('click', () => {
+  // Sestav seznam všech nadcházejících termínů
+  const udalosti = [];
+  vsechnaData.forEach(v => {
+    if (v.revize) {
+      const d = new Date(v.revize);
+      d.setMonth(d.getMonth() + 3);
+      udalosti.push({
+        nazev: v.nazev,
+        typ: 'Revize',
+        datum: d
+      });
+    }
+    if (v.zkouska) {
+      const d = new Date(v.zkouska);
+      d.setFullYear(d.getFullYear() + 3);
+      udalosti.push({
+        nazev: v.nazev,
+        typ: 'Zkouška',
+        datum: d
+      });
+    }
+    if (v.inspekce) {
+      const d = new Date(v.inspekce);
+      d.setFullYear(d.getFullYear() + 6);
+      udalosti.push({
+        nazev: v.nazev,
+        typ: 'Inspekce',
+        datum: d
+      });
+    }
+  });
+
+  // Seřaď podle data
+  udalosti.sort((a, b) => a.datum - b.datum);
+
+  // Připrav data pro PDF
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Kalendář termínů výtahů", 14, 15);
+
+  doc.setFontSize(10);
+  const today = new Date().toLocaleDateString('cs-CZ');
+  doc.text(`Exportováno: ${today}`, 14, 22);
+
+  const head = [["Výtah", "Typ kontroly", "Datum"]];
+  const body = udalosti.map(e => [
+    e.nazev,
+    e.typ,
+    `${e.datum.getDate()}. ${e.datum.getMonth()+1}. ${e.datum.getFullYear()}`
+  ]);
+
+  doc.autoTable({
+    head,
+    body,
+    startY: 28,
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 3, overflow: 'linebreak' },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    margin: { left: 10, right: 10 }
+  });
+
+  doc.save(`kalendar_vytahu_${today}.pdf`);
+});
+
+
+    // Export do PDF vybraných
+    document.getElementById('exportVybranePDF').addEventListener('click', () => {
+      const checkboxes = document.querySelectorAll('.vytah-checkbox:checked');
+      const ids = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+      const vybrane = vsechnaData.filter(v => ids.includes(v.id));
+      if (vybrane.length === 0) {
+        alert('Nevybral jsi žádné výtahy k exportu.');
+        return;
+      }
+      exportToPDF(vybrane, true);
+    });
+    function smazatVytah(id) {
+  if (!confirm("Opravdu chceš smazat tento výtah?")) return;
+
+  fetch(`/api/vytahy/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': localStorage.getItem('token') || ''
+    }
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Nepodařilo se smazat výtah.");
+    zprava.textContent = '✅ Výtah byl úspěšně smazán.';
+    return nactiVytahy(); // znovu načti výtahy
+  })
+  .catch(err => {
+    zprava.textContent = '❌ ' + err.message;
+  })
+  .finally(() => {
+    setTimeout(() => zprava.textContent = '', 3000);
+  });
+}
+
+    function exportToPDF(vytahy, vybrane = false) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape' });
+      const today = new Date().toLocaleDateString('cs-CZ');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(vybrane ? "Vybrané výtahy" : "Seznam výtahů", 14, 15);
+      doc.setFontSize(9);
+      doc.text(`Exportováno: ${today}`, 14, 22);
+      doc.autoTable({
+        head: [[
+          "Název", "Adresa", "Výrobce", "Výrobní číslo", "Typ",
+          "Výroba", "Pater", "Zdvih", "Nosnost",
+          "Revize", "Zkouška", "Inspekce"
+        ]],
+        body: vytahy.map(v => [
+          v.nazev || "",
+          v.adresa || "",
+          v.vyrobce || "",
+          v.vyrobniCislo || "",
+          v.typ || "",
+          v.datumVyroby || "",
+          v.pocetPater || "",
+          v.zdvih || "",
+          v.nosnost || "",
+          v.revize || "-",
+          v.zkouska || "-",
+          v.inspekce || "-"
+        ]),
+        startY: 28,
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
+        headStyles: { fillColor: [76, 175, 80], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 10, right: 10 }
+      });
+      doc.save(`${vybrane ? 'vytahy_vybrane' : 'vytahy'}_${today}.pdf`);
+    }
+document.getElementById('exportListMonthPDF').addEventListener('click', () => {
+  const dnes = new Date();
+  const aktualniMesic = dnes.getMonth();
+  const aktualniRok = dnes.getFullYear();
+
+  const udalostiMesice = [];
+
+  vsechnaData.forEach(v => {
+    const pushEvent = (datum, typ, barva) => {
+      if (!datum) return;
+      const d = new Date(datum);
+      if (isNaN(d)) return;
+
+      if (typ === 'Revize') d.setMonth(d.getMonth() + 3);
+      if (typ === 'Zkouška') d.setFullYear(d.getFullYear() + 3);
+      if (typ === 'Inspekce') d.setFullYear(d.getFullYear() + 6);
+
+      if (d.getMonth() === aktualniMesic && d.getFullYear() === aktualniRok) {
+        udalostiMesice.push({
+          nazev: v.nazev,
+          typ: typ,
+          datum: d
+        });
+      }
+    };
+
+    if (v.revize) pushEvent(v.revize, 'Revize');
+    if (v.zkouska) pushEvent(v.zkouska, 'Zkouška');
+    if (v.inspekce) pushEvent(v.inspekce, 'Inspekce');
+  });
+
+  if (udalostiMesice.length === 0) {
+    alert("V tomto měsíci nejsou žádné plánované události.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Události tohoto měsíce", 14, 15);
+
+  const today = new Date().toLocaleDateString('cs-CZ');
+  doc.setFontSize(10);
+  doc.text(`Exportováno: ${today}`, 14, 22);
+
+  const head = [["Výtah", "Typ", "Datum"]];
+  const body = udalostiMesice.map(e => [
+    e.nazev,
+    e.typ,
+    `${e.datum.getDate()}. ${e.datum.getMonth()+1}. ${e.datum.getFullYear()}`
+  ]);
+
+  doc.autoTable({
+    head,
+    body,
+    startY: 28,
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    margin: { left: 10, right: 10 }
+  });
+
+  doc.save(`udalosti_mesic_${today}.pdf`);
+});
+
+  </script>
+</body>
+</html>
